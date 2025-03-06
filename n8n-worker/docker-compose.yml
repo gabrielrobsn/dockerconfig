@@ -1,0 +1,34 @@
+services:
+  n8n-worker:
+    image: n8nio/n8n:1.53.2
+    restart: always
+    networks:
+      - n8n
+    command: "worker"
+    environment:
+    - DB_TYPE=postgresdb
+    - DB_POSTGRESDB_HOST=postgres
+    - DB_POSTGRESDB_PORT=5432
+    - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+    - DB_POSTGRESDB_USER=${POSTGRES_NON_ROOT_USER}
+    - DB_POSTGRESDB_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
+    - EXECUTIONS_MODE=queue
+    - QUEUE_BULL_REDIS_HOST=redis
+    - QUEUE_HEALTH_CHECK_ACTIVE=true
+    - N8N_BASIC_AUTH_ACTIVE=true
+    - N8N_BASIC_AUTH_USER
+    - N8N_BASIC_AUTH_PASSWORD
+    - N8N_ENCRYPTION_KEY=tcPoGABV15a7FsAXtGoEryzs6K4U
+    - GENERIC_TIMEZONE=America/Sao_Paulo
+    depends_on:
+      - n8n
+    volumes:
+    - n8n_storage:/home/node/.n8n
+
+networks:
+  n8n:
+    external: true
+
+volumes:
+  n8n_storage:
+    external: true

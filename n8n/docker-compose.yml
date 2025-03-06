@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: postgres:14.11
+    restart: always
+    networks:
+      - n8n
+    container_name: n8n_postgres
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - POSTGRES_NON_ROOT_USER
+      - POSTGRES_NON_ROOT_PASSWORD
+    volumes:
+      - n8n_db_storage:/var/lib/postgresql/data
+      - /home/selfhost/init-data.sh:/docker-entrypoint-initdb.d/init-data.sh
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7.2.4
+    restart: always
+    networks:
+      - n8n
+    container_name: n8n_redis
+    volumes:
+      - redis_storage:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  n8n:
+    image: n8nio/n8n:1.53.2
+    restart: always
+    command: "start"
+    container_name: n8n_manager
+    environment:
+      - N8N_HOST=n8n.supercapsp.email
+      - N8N_PORT=5678
+      - N8N_EDITOR_BASE_URL=https://n8n.supercapsp.email/
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://n8n.supercapsp.email/
+      - DB_TYPE=postgresdb
+      - N8N_EMAIL_MODE=smtp
+      - N8N_SMTP_HOST=${SMTP_HOST}
+      - N8N_SMTP_PORT=465
+      - N8N_SMTP_USER=${SMTP_USER}
+      - N8N_SMTP_PASS=${SMTP_PASS}
+      - N8N_SMTP_SENDER=${SMTP_USER}
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_NON_ROOT_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_HEALTH_CHECK_ACTIVE=true
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER
+      - N8N_BASIC_AUTH_PASSWORD
+      - N8N_ENCRYPTION_KEY=tcPoGABV15a7FsAXtGoEryzs6K4U
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+    networks:
+      - traefik
+      - n8n
+    volumes:
+    - /n8n-files:/files
+    - n8n_storage:/home/node/.n8n
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.n8n.rule=Host(`n8n.supercapsp.email`) || Host(`n8n.timulticap.com`)"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+      - "traefik.http.routers.n8n.entrypoints=https"
+      - "traefik.http.routers.n8n.tls=true"
+      - "traefik.http.routers.n8n.tls.certresolver=cloudflare"
+
+networks:
+  n8n:
+    external: true
+  traefik:
+    external: true
+
+volumes:
+  n8n_db_storage:
+    external: true
+  n8n_storage:
+    external: true
+  redis_storage:
+    external: true
